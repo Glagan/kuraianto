@@ -6,7 +6,7 @@
 /*   By: ncolomer <ncolomer@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2020/03/05 12:58:54 by ncolomer          #+#    #+#             */
-/*   Updated: 2020/03/05 14:07:16 by ncolomer         ###   ########.fr       */
+/*   Updated: 2020/03/06 12:41:44 by ncolomer         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -34,6 +34,7 @@ enum ParamKey {
 	P_SEND_SIZE,
 	P_TIMEOUT,
 	P_INTERVAL,
+	P_MAX_SIZE,
 	P_NO_OUTPUT
 };
 
@@ -52,6 +53,7 @@ typedef struct s_options {
 	Range recvSize;
 	Range sendSize;
 	Range interval;
+	int biggesBufferSize;
 	int maxSize;
 	int timeout;
 	bool noOutput;
@@ -112,8 +114,9 @@ void showUsage(void) {
 				\r\r\r\trange: value | min-max | -max\n\
 				\r\r\r\t-r range=5\tSet packet size when receiving.\n\
 				\r\r\r\t-s range=5\tSet packet size when sending.\n\
-				\r\r\r\t-t number=30\tMaximum time to wait (s) if there is no response.\n\
+				\r\r\r\t-t number=5\tMaximum time to wait (s) if there is no response.\n\
 				\r\r\r\t-i range=0\tSet interval (ms) between sending and receiving.\n\
+				\r\r\r\t-m number=0\tMaximum size (bytes) the client can send.\n\
 				\r\r\r\t--no-output\tDo not display received response\n";
 }
 
@@ -183,8 +186,9 @@ void setDefault(Options &options) {
 	options.sendSize.max = 5;
 	options.interval.min = 0;
 	options.interval.max = 0;
-	options.maxSize = 5;
-	options.timeout = 30;
+	options.biggesBufferSize = 5;
+	options.maxSize = 0;
+	options.timeout = 5;
 	options.noOutput = false;
 }
 
@@ -200,19 +204,23 @@ bool setOptions(Options &options, size_t argc, char const **argv) {
 						(strcmp(argv[i], "-s") == 0) ? P_SEND_SIZE :
 						(strcmp(argv[i], "-t") == 0) ? P_TIMEOUT   :
 						(strcmp(argv[i], "-i") == 0) ? P_INTERVAL  :
+						(strcmp(argv[i], "-m") == 0) ? P_MAX_SIZE  :
 						(strcmp(argv[i], "--no-output") == 0) ? P_NO_OUTPUT : P_INVALID;
 			} else if (state == P_TIMEOUT) {
 				options.timeout = std::stoi(argv[i]);
 				if (options.timeout < 1)
 					return (false);
 				state = P_NONE;
+			} else if (state == P_MAX_SIZE) {
+				options.maxSize = std::stoi(argv[i]);
+				state = P_NONE;
 			} else {
 				Range &which =  (state == P_RECV_SIZE) ? options.recvSize :
 								(state == P_SEND_SIZE) ? options.sendSize : options.interval;
 				if (setRange(which, state, argv[i]))
 					return (false);
-				if (which.max > options.maxSize)
-					options.maxSize = which.max;
+				if (which.max > options.biggesBufferSize)
+					options.biggesBufferSize = which.max;
 				state = P_NONE;
 			}
 			if (state == P_NO_OUTPUT) {
@@ -300,15 +308,11 @@ int main(int argc, char const **argv) {
 	if (!openSocket(server, options.ip, options.port))
 		return (1);
 	signal(SIGINT, stop);
-	// std::cout << "Parameters: receive<" << options.recvSize.min << "-" << options.recvSize.max << "> "
-	// 		<< "send<" << options.sendSize.min << "-" << options.sendSize.max << "> "
-	// 		<< "interval<" << options.interval.min << "-" << options.interval.max << "ms> "
-	// 		<< "timeout<" << options.timeout << "s>" << std::endl;
 	std::cout << "connected to " << options.ip << ":" << options.port << "\n";
 
 	// Check stdin
 	// main
-	char buffer[options.maxSize];
+	char buffer[options.biggesBufferSize];
 	SelectSet set;
 	Stats stats;
 	setStats(stats);
@@ -341,7 +345,10 @@ int main(int argc, char const **argv) {
 			}
 			std::cout << ((tic++ % 2 == 0) ? "tac" : "tic") << std::endl;
 			if (tic > options.timeout) {
-				std::cout << BRED "It's been " << options.timeout << " seconds, what are you doing ?" BNRM;
+				if (!stats.totalRecv || !stats.totalSend)
+					std::cout << BRED "It's been " << options.timeout << " seconds, what are you doing ?" BNRM;
+				else
+					std::cout << "Connection expired after " << options.timeout << " seconds, that's too bad (or is it ?)";
 				break ;
 			}
 			continue ;
@@ -375,7 +382,10 @@ int main(int argc, char const **argv) {
 				std::cout << std::endl;
 			if (!already.second)
 				std::cout << "reading stdin... ";
-			if ((stats.lastRead = read(STDIN_FILENO, buffer, options.getSize(P_SEND_SIZE))) < 0) {
+			int nextSendSize = options.getSize(P_SEND_SIZE);
+			if (options.maxSize > 0 && stats.totalSend + nextSendSize > options.maxSize)
+				nextSendSize = (stats.totalSend + nextSendSize - options.maxSize);
+			if ((stats.lastRead = read(STDIN_FILENO, buffer, nextSendSize)) < 0) {
 				std::cout << "kuraianto: error while reading stdin";
 				break ;
 			}
@@ -394,6 +404,10 @@ int main(int argc, char const **argv) {
 				}
 				stats.totalSend += stats.lastSend;
 				outputBytes(already.second, stats.lastSend, "sent");
+				if (options.maxSize > 0 && stats.totalSend >= options.maxSize) {
+					std::cout << "send enough (" << options.maxSize << " bytes), done" << std::endl;
+					break ;
+				}
 			}
 			already.second = stats.lastSend;
 			already.first = 0;
@@ -414,7 +428,7 @@ int main(int argc, char const **argv) {
 			KYEL "###" KNRM << std::flush;
 		if (!options.noOutput) {
 			lseek(fileout, 0, SEEK_SET);
-			while ((stats.lastRead = read(fileout, buffer, options.maxSize)) > 0) {
+			while ((stats.lastRead = read(fileout, buffer, options.biggesBufferSize)) > 0) {
 				write(STDOUT_FILENO, buffer, stats.lastRead);
 			}
 			std::cout << KYEL "###" KNRM;
