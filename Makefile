@@ -6,11 +6,11 @@
 #    By: ncolomer <ncolomer@student.42.fr>          +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2020/03/05 12:58:59 by ncolomer          #+#    #+#              #
-#    Updated: 2020/03/05 13:02:47 by ncolomer         ###   ########.fr        #
+#    Updated: 2020/03/07 16:46:24 by ncolomer         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
-SRCS			= kuraianto.cpp
+SRCS			= kuraianto.cpp options.cpp
 OBJS			= $(SRCS:.cpp=.o)
 CXX				= clang++
 RM				= rm -f

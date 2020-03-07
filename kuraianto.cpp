@@ -6,242 +6,62 @@
 /*   By: ncolomer <ncolomer@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2020/03/05 12:58:54 by ncolomer          #+#    #+#             */
-/*   Updated: 2020/03/06 12:41:44 by ncolomer         ###   ########.fr       */
+/*   Updated: 2020/03/07 19:07:35 by ncolomer         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <iostream>
-#include <vector>
-#include <utility>
-#include <unistd.h>
-#include <sys/types.h>
-#include <stdlib.h>
-#include <sys/socket.h>
-#include <sys/select.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <fcntl.h>
-#include <sys/time.h>
-#include <errno.h>
-#include <time.h>
-#include "string.h"
-#include "terminal.h"
-
-enum ParamKey {
-	P_INVALID = -1,
-	P_NONE = 0,
-	P_RECV_SIZE,
-	P_SEND_SIZE,
-	P_TIMEOUT,
-	P_INTERVAL,
-	P_MAX_SIZE,
-	P_NO_OUTPUT
-};
-
-typedef struct s_range {
-    int min;
-    int max;
-} Range;
-
-int randBetween(Range const &range) {
-	return ((rand() % (range.max - range.min + 1)) + range.min);
-}
-
-typedef struct s_options {
-	std::string ip;
-	int port;
-	Range recvSize;
-	Range sendSize;
-	Range interval;
-	int biggesBufferSize;
-	int maxSize;
-	int timeout;
-	bool noOutput;
-
-	int getSize(ParamKey type) {
-		Range &which =  (type == P_RECV_SIZE) ? this->recvSize :
-						(type == P_SEND_SIZE) ? this->sendSize : this->interval;
-		if (which.min == which.max)
-			return (which.min);
-		return (randBetween(which));
-	}
-} Options;
-
-typedef struct s_socket {
-	int fd;
-	socklen_t len;
-	struct sockaddr_in addr;
-} Socket;
-
-enum FDType {
-	FD_READ = 0,
-	FD_WRITE = 1
-};
-
-typedef struct s_set {
-	fd_set readfds;
-	fd_set writefds;
-
-	void zero(void) {
-		FD_ZERO(&this->readfds);
-		FD_ZERO(&this->writefds);
-	}
-
-	void add(FDType type, int fd) {
-		FD_SET(fd, (type == FD_READ) ? &this->readfds : &this->writefds);
-	}
-
-	bool ready(FDType type, int fd) {
-		return (FD_ISSET(fd, (type == FD_READ) ? &this->readfds : &this->writefds));
-	}
-} SelectSet;
-
-typedef struct s_stats {
-	struct timeval started;
-	int lastRead;
-	int lastSend;
-	int lastRecv;
-	int totalRead;
-	int totalSend;
-	int totalRecv;
-} Stats;
+#include "kuraianto.hpp"
+#include "options.hpp"
 
 int g_running = 1;
 
 void showUsage(void) {
 	std::cout << "usage: [ip:]port [options]\n\
-				\r\r\r\rOptions:\n\
-				\r\r\r\trange: value | min-max | -max\n\
-				\r\r\r\t-r range=5\tSet packet size when receiving.\n\
-				\r\r\r\t-s range=5\tSet packet size when sending.\n\
-				\r\r\r\t-t number=5\tMaximum time to wait (s) if there is no response.\n\
-				\r\r\r\t-i range=0\tSet interval (ms) between sending and receiving.\n\
-				\r\r\r\t-m number=0\tMaximum size (bytes) the client can send.\n\
-				\r\r\r\t--no-output\tDo not display received response\n";
+			\r\r\rOptions:\n\
+			\r\r\trange: value | min-max | -max\n\
+			\r\r\trequests: [Type,uri,[Header-Name: value,]*bodySize;]+\n\
+			\r\r\theaders: [Name: value#]+\n\
+			\r\r\t-r range=5\tSet packet size when receiving.\n\
+			\r\r\t-s range=5\tSet packet size when sending.\n\
+			\r\r\t-t number=5\tMaximum time to wait (s) if there is no response.\n\
+			\r\r\t-i range=0\tSet interval (ms) between sending and receiving.\n\
+			\r\r\t-m number=0\tMaximum size (bytes) the client can send.\n\
+			\r\r\t--no-output\tDo not display received response\n\
+			\r\r\t-g requests\tGenerate one or many requests.\n\
+			\r\r\tThe next options are only applied on requests generated with -g\n\
+			\r\r\t-h headers\tAdd each listed headers to the generated requests.\n\
+			\r\r\t-c range=8\tSet the size of sent chunk if the generated request has Transfer-Encoding: chunked\n";
 }
 
-std::vector<std::string> split(std::string const &string, std::string const &sep) {
-	size_t pos, offset = 0;
-	std::vector<std::string> ret;
-	if (string.length() == 0 || sep.length() == 0) {
-		ret.push_back(string);
-		return (ret);
-	}
-	while ((pos = string.find(sep, offset)) != std::string::npos) {
-		if (offset == pos)
-			++offset;
-		else {
-			ret.push_back(string.substr(offset, pos - offset));
-			offset = pos + sep.length();
-		}
-	}
-	if (offset < pos)
-		ret.push_back(string.substr(offset, pos - offset));
-	return ret;
-}
-
-bool setIp(Options &options, char const *value) {
-	if (!value || !value[0])
+bool createOut(Output &out, int idx) {
+	out.name = "kuraianto_out" + idx;
+	if ((out.fd = open(out.name.c_str(), O_TRUNC | O_RDWR | O_APPEND | O_CREAT, 0666)) < 0)
 		return (false);
-	std::vector<std::string> const &values = split(value, ":");
-	if (values.size() > 2)
-		return (false);
-	if (values.size() == 2)
-		options.ip = values[0];
-	if ((options.port = std::stoi(values.back())) < 80 || options.port > 65535)
-		return (false);
+	fcntl(out.fd, F_SETFL, O_NONBLOCK);
 	return (true);
 }
 
-bool setRange(Range &range, ParamKey type, char const *value) {
-	if (!value || !value[0])
-		return (false);
-	std::vector<std::string> const &values = split(value, "-");
-	if (values.size() > 2)
-		return (false);
-	if (values.size() == 1) {
-		if (value[0] == '-') {
-			range.min = 1;
-			range.max = std::stoi(values[0]);
-		} else {
-			range.min = range.max = std::stoi(values[0]);
+void displayOut(Request &req) {
+	char buffer[4096];
+	Stats &stats = req.stats;
+
+	if (stats.totalRead > 0) {
+		std::cout << KYEL "\n###" KNRM "\n" \
+			KCYN "Received" KNRM ": " KMAG << stats.totalRecv << " bytes\n" KNRM \
+			KBLU "Sent" KNRM ": " KMAG << stats.totalSend << " bytes" KNRM " / " \
+			KBLU "Read" KNRM ": " KMAG << stats.totalRead << " bytes\n" KNRM \
+			KYEL "###" KNRM << std::flush;
+		if (req.output.fd > 0) {
+			lseek(req.output.fd, 0, SEEK_SET);
+			int lastRead = 0;
+			while ((lastRead = read(req.output.fd, buffer, 4096)) > 0)
+				write(STDOUT_FILENO, buffer, lastRead);
+			std::cout << KYEL "###" KNRM;
 		}
-	} else {
-		range.min = std::stoi(values[0]);
-		range.max = std::stoi(values[1]);
+		std::cout << '\n';
+		unlink(req.output.name.c_str());
+		close(req.output.fd);
 	}
-	if (range.min > range.max
-		|| ((range.min < 1 && type != P_INTERVAL)
-		|| (range.min >= 0)))
-		return (false);
-	return (true);
-}
-
-void setDefault(Options &options) {
-	options.ip = "127.0.0.1";
-	options.port = 0;
-	options.recvSize.min = 5;
-	options.recvSize.max = 5;
-	options.sendSize.min = 5;
-	options.sendSize.max = 5;
-	options.interval.min = 0;
-	options.interval.max = 0;
-	options.biggesBufferSize = 5;
-	options.maxSize = 0;
-	options.timeout = 5;
-	options.noOutput = false;
-}
-
-bool setOptions(Options &options, size_t argc, char const **argv) {
-	setDefault(options);
-	try {
-		if (!setIp(options, argv[1]))
-			return (false);
-		ParamKey state = P_NONE;
-		for (size_t i = 2; state >= 0 && i < argc; ++i) {
-			if (!state) {
-				state = (strcmp(argv[i], "-r") == 0) ? P_RECV_SIZE :
-						(strcmp(argv[i], "-s") == 0) ? P_SEND_SIZE :
-						(strcmp(argv[i], "-t") == 0) ? P_TIMEOUT   :
-						(strcmp(argv[i], "-i") == 0) ? P_INTERVAL  :
-						(strcmp(argv[i], "-m") == 0) ? P_MAX_SIZE  :
-						(strcmp(argv[i], "--no-output") == 0) ? P_NO_OUTPUT : P_INVALID;
-			} else if (state == P_TIMEOUT) {
-				options.timeout = std::stoi(argv[i]);
-				if (options.timeout < 1)
-					return (false);
-				state = P_NONE;
-			} else if (state == P_MAX_SIZE) {
-				options.maxSize = std::stoi(argv[i]);
-				state = P_NONE;
-			} else {
-				Range &which =  (state == P_RECV_SIZE) ? options.recvSize :
-								(state == P_SEND_SIZE) ? options.sendSize : options.interval;
-				if (setRange(which, state, argv[i]))
-					return (false);
-				if (which.max > options.biggesBufferSize)
-					options.biggesBufferSize = which.max;
-				state = P_NONE;
-			}
-			if (state == P_NO_OUTPUT) {
-				options.noOutput = true;
-				state = P_NONE;
-			}
-		}
-		if (state == P_INVALID)
-			return (false);
-		return (true);
-	} catch(const std::exception& e) {
-		return (false);
-	}
-}
-
-int createOut(void) {
-	int fd = open("kuraianto_out", O_TRUNC | O_RDWR | O_APPEND | O_CREAT, 0666);
-	if (fd < 0)
-		perror("kuraianto: open");
-	fcntl(fd, F_SETFL, O_NONBLOCK);
-	return (fd);
 }
 
 bool openSocket(Socket &socket, std::string const &ip, int port) {
@@ -262,9 +82,6 @@ bool openSocket(Socket &socket, std::string const &ip, int port) {
 }
 
 void setStats(Stats &stats) {
-	stats.lastRead = 0;
-	stats.lastSend = 0;
-	stats.lastRecv = 0;
 	stats.totalRead = 0;
 	stats.totalSend = 0;
 	stats.totalRecv = 0;
@@ -286,6 +103,34 @@ void stop(int sig) {
 	std::cout << "\ntrying to close server after interrupt\n";
 }
 
+void startSingleRequest(Socket &server, Options &options) {
+	Output out;
+	if (!options.noOutput && !createOut(out, 1))
+		perror("kuraianto: open");
+}
+
+void startGeneratedRequests(Socket &server, Options &options) {
+	// Open output files
+	if (!options.noOutput) {
+		int idx = 0;
+		for (auto &req : options.requests) {
+			if (!createOut(req.output, ++idx)) {
+				idx = -1;
+				break ;
+			}
+		}
+		if (idx == -1) {
+			for (auto &req : options.requests) {
+				if (req.output.fd > 0) {
+					close(req.output.fd);
+					unlink(req.output.name.c_str());
+				}
+			}
+			perror("kuraianto: open");
+		}
+	}
+}
+
 int main(int argc, char const **argv) {
 	if (argc < 2) {
 		showUsage();
@@ -301,16 +146,23 @@ int main(int argc, char const **argv) {
 	}
 	srand(time(0));
 
-	// Create output file and open socket
-	int fileout = createOut();
-	fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK);
+	// Connect to server
 	Socket server;
 	if (!openSocket(server, options.ip, options.port))
 		return (1);
 	signal(SIGINT, stop);
 	std::cout << "connected to " << options.ip << ":" << options.port << "\n";
 
-	// Check stdin
+	// Start requests
+	if (options.requests.size()) {
+		startSingleRequest(server, options);
+	} else {
+		startGeneratedRequests(server, options);
+	}
+
+	// done
+	close(server.fd);
+
 	// main
 	char buffer[options.biggesBufferSize];
 	SelectSet set;
