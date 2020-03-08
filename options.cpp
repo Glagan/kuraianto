@@ -6,7 +6,7 @@
 /*   By: ncolomer <ncolomer@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2020/03/07 16:43:37 by ncolomer          #+#    #+#             */
-/*   Updated: 2020/03/08 16:22:11 by ncolomer         ###   ########.fr       */
+/*   Updated: 2020/03/08 22:16:57 by ncolomer         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -29,7 +29,11 @@ Options::Options() {
 	this->chunkSize.max = 8;
 }
 
-Options::~Options() {}
+Options::~Options() {
+	for (auto &definition : this->requests) {
+		delete definition;
+	}
+}
 
 int Options::rangeRand(Range const &range) const {
 	return ((rand() % (range.max - range.min + 1)) + range.min);
@@ -105,21 +109,21 @@ bool Options::setRange(Range &range, Key type, char const *value) {
 bool Options::setRequests(char const *value) {
 	std::vector<std::string> const &requests = split(value, ";");
 	for (auto const &rawRequest : requests) {
-		std::vector<std::string> const &parts = split(value, ",");
-		if (parts.size() < 3)
+		std::vector<std::string> const &parts = split(rawRequest, ",");
+		if (parts.size() == 1 && this->requests.size() > 0) {
+			if ((this->requests.back()->repeat = std::stoi(parts[0])) < 0)
+				return (false);
+			continue ;
+		} else if (parts.size() < 3)
 			return (false);
-		this->requests.push_back(RequestDefinition());
-		RequestDefinition &req = this->requests.back();
-		req.type = parts[0];
-		req.url = parts[1];
+		RequestDefinition *def = new RequestDefinition();
+		this->requests.push_back(def);
+		def->type = parts[0];
+		def->url = parts[1];
 		for (size_t i = 2; i < parts.size() - 1; ++i)
-			req.headers.push_back(parts[i]);
-		try {
-			req.bodySize = std::stoi(parts.back());
-		} catch(const std::exception& e) {
-			return (false);
-		}
-		if (req.bodySize < 0)
+			def->headers.push_back(parts[i]);
+		def->bodySize = std::stol(parts.back());
+		if (def->bodySize < 0)
 			return (false);
 	}
 	return (true);
@@ -146,7 +150,7 @@ bool Options::initalize(size_t argc, char const **argv) {
 					return (false);
 				state = P_NONE;
 			} else if (state == P_MAX_SIZE) {
-				this->maxSize = std::stoi(argv[i]);
+				this->maxSize = std::stol(argv[i]);
 				state = P_NONE;
 			} else if (state == P_GENERATE) {
 				if (!this->setRequests(argv[i]))

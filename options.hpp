@@ -6,7 +6,7 @@
 /*   By: ncolomer <ncolomer@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2020/03/07 16:45:28 by ncolomer          #+#    #+#             */
-/*   Updated: 2020/03/08 16:21:46 by ncolomer         ###   ########.fr       */
+/*   Updated: 2020/03/08 21:59:53 by ncolomer         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,7 +18,10 @@ typedef struct s_request_definition {
 	std::string type;
 	std::string url;
 	std::vector<std::string> headers;
-	int bodySize;
+	long bodySize;
+	int repeat;
+
+	s_request_definition(void): repeat(1) {}
 } RequestDefinition;
 
 class Options {
@@ -49,9 +52,9 @@ public:
 	Range sendSize;
 	Range interval;
 	int biggestBufferSize;
-	int maxSize;
+	long maxSize;
 	int timeout;
-	std::vector<RequestDefinition> requests;
+	std::vector<RequestDefinition*> requests;
 	std::vector<std::string> headers;
 	Range chunkSize;
 	bool noOutput;

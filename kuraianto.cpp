@@ -6,7 +6,7 @@
 /*   By: ncolomer <ncolomer@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2020/03/05 12:58:54 by ncolomer          #+#    #+#             */
-/*   Updated: 2020/03/08 19:26:57 by ncolomer         ###   ########.fr       */
+/*   Updated: 2020/03/08 22:44:35 by ncolomer         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,7 +18,7 @@ void showUsage(void) {
 	std::cout << "usage: [ip:]port [options]\n\
 		\r\rOptions:\n\
 		\r\trange: value | min-max | -max\n\
-		\r\trequests: [Type,uri,[Header-Name: value,]*bodySize;]+\n\
+		\r\trequests: [Type,uri,[Header-Name: value,]*bodySize;[repeat;]]+\n\
 		\r\theaders: [Name: value#]+\n\
 		\r\t-r range=5\tSet packet size when receiving.\n\
 		\r\t-s range=5\tSet packet size when sending.\n\
@@ -43,9 +43,8 @@ void outputBytes(int value, int compare, std::string const &prefix) {
 }
 
 void stop(int sig) {
-	(void)sig;
 	g_running = 0;
-	std::cout << "\ntrying to close server after interrupt\n";
+	std::cout << "Closing server after interrupt (" << sig << ")\n";
 }
 
 int main(int argc, char const **argv) {
@@ -69,19 +68,19 @@ int main(int argc, char const **argv) {
 	if (!options.requests.size())
 		requests.push_back(new FileRequest(options, STDIN_FILENO));
 	else for (auto const &requestDefinition : options.requests)
-		requests.push_back(new GeneratedRequest(options, requestDefinition));
+			for (int i = 0; i < requestDefinition->repeat; ++i)
+				requests.push_back(new GeneratedRequest(options, *requestDefinition));
 
 	// Initialize connections
 	for (auto &request : requests) {
 		if (!request->initialize()) {
-			perror("kuraianto: ");
 			g_running = false;
 			break ;
 		}
 	}
 
 	// main
-	char buffer[options.biggestBufferSize];
+	signal(SIGINT, &stop);
 	SelectSet set;
 	struct timeval timeout;
 	int activity;
@@ -111,11 +110,12 @@ int main(int argc, char const **argv) {
 		}
 
 		// Send and receive each requests
-		for (auto const &request : requests) {
+		for (auto &request : requests) {
 			if (!request->isClosed()) {
 				request->receive(set);
 				if (!request->isCompleted())
 					request->send(set);
+				request->showRecap();
 			}
 		}
 
