@@ -6,12 +6,11 @@
 /*   By: ncolomer <ncolomer@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2020/03/05 13:02:51 by ncolomer          #+#    #+#             */
-/*   Updated: 2020/03/05 13:06:53 by ncolomer         ###   ########.fr       */
+/*   Updated: 2020/03/08 17:18:21 by ncolomer         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef TERMINAL_H
-# define TERMINAL_H
+#pragma once
 
 # define KNRM  "\x1B[0m"
 # define KRED  "\x1B[31m"
@@ -30,5 +29,3 @@
 # define BMAG  "\x1B[45m"
 # define BCYN  "\x1B[46m"
 # define BWHT  "\x1B[47m"
-
-#endif

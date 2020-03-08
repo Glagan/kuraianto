@@ -41,10 +41,6 @@ If the ``Transfer-Encoding`` header is set to ``chunked`` **kuraianto** will sen
 
 ## TODO
 
-* Make a global ``Request`` class to wrap a "reading from stdin" request and a generated request
-	* Loop through requests and send/receive on them
-	* Need to make one connection to the server per request
-* Make classes instead of structs, or add constructors
-* Sepate in more files, or less...
+* Generate requests
 * ``-a``
 	* Read and send all files given as the value (e.g: a folder ``examples`` or list of files ``examples/1.req,examples/2.req``)

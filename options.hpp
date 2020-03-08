@@ -1,60 +1,64 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   options.hpp                                        :+:      :+:    :+:   */
+/*   Options.hpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: ncolomer <ncolomer@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2020/03/07 16:45:28 by ncolomer          #+#    #+#             */
-/*   Updated: 2020/03/07 16:54:16 by ncolomer         ###   ########.fr       */
+/*   Updated: 2020/03/08 16:21:46 by ncolomer         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef OPTIONS_HPP
-# define OPTIONS_HPP
+#pragma once
 
-# include "kuraianto.hpp"
+# include "Utility.hpp"
 
-enum ParamKey {
-	P_INVALID = -1,
-	P_NONE = 0,
-	P_RECV_SIZE,
-	P_SEND_SIZE,
-	P_TIMEOUT,
-	P_INTERVAL,
-	P_MAX_SIZE,
-	P_GENERATE,
-	P_HEADERS,
-	P_CHUNK_SIZE,
-	P_NO_OUTPUT
-};
+typedef struct s_request_definition {
+	std::string type;
+	std::string url;
+	std::vector<std::string> headers;
+	int bodySize;
+} RequestDefinition;
 
-int rangeRand(Range const &range);
+class Options {
+public:
+	enum Key {
+		P_INVALID = -1,
+		P_NONE = 0,
+		P_RECV_SIZE,
+		P_SEND_SIZE,
+		P_TIMEOUT,
+		P_INTERVAL,
+		P_MAX_SIZE,
+		P_GENERATE,
+		P_HEADERS,
+		P_CHUNK_SIZE,
+		P_NO_OUTPUT
+	};
+private:
+	int rangeRand(Range const &range) const;
 
-typedef struct s_options {
+	bool setIp(char const *value);
+	bool setRange(Range &range, Key type, char const *value);
+	bool setRequests(char const *value);
+public:
 	std::string ip;
 	int port;
 	Range recvSize;
 	Range sendSize;
 	Range interval;
-	int biggesBufferSize;
+	int biggestBufferSize;
 	int maxSize;
 	int timeout;
-	std::vector<Request> requests;
+	std::vector<RequestDefinition> requests;
 	std::vector<std::string> headers;
 	Range chunkSize;
 	bool noOutput;
 
-	int getSize(ParamKey type) {
-		Range &which =  (type == P_RECV_SIZE) ? this->recvSize :
-						(type == P_SEND_SIZE) ? this->sendSize :
-						(type == P_INTERVAL)  ? this->interval : this->chunkSize;
-		if (which.min == which.max)
-			return (which.min);
-		return (rangeRand(which));
-	}
-} Options;
+	Options();
+	virtual ~Options();
+	bool initalize(size_t argc, char const **argv);
 
-bool setOptions(Options &options, size_t argc, char const **argv);
-
-#endif
+	int getSize(Key range) const;
+};

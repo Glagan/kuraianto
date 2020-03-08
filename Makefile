@@ -6,15 +6,15 @@
 #    By: ncolomer <ncolomer@student.42.fr>          +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2020/03/05 12:58:59 by ncolomer          #+#    #+#              #
-#    Updated: 2020/03/07 16:46:24 by ncolomer         ###   ########.fr        #
+#    Updated: 2020/03/08 17:20:55 by ncolomer         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
-SRCS			= kuraianto.cpp options.cpp
+SRCS			= kuraianto.cpp Options.cpp Request.cpp Utility.cpp
 OBJS			= $(SRCS:.cpp=.o)
 CXX				= clang++
 RM				= rm -f
-CXXFLAGS		= -std=c++11 -I.
+CXXFLAGS		= -g -std=c++11 -I.
 NAME			= kuraianto
 
 all:			$(NAME)
