@@ -6,7 +6,7 @@
 /*   By: ncolomer <ncolomer@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2020/03/08 14:55:30 by ncolomer          #+#    #+#             */
-/*   Updated: 2020/03/09 14:20:17 by ncolomer         ###   ########.fr       */
+/*   Updated: 2020/03/09 19:50:28 by ncolomer         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -23,7 +23,7 @@ void Request::deleteBuffer(void) {
 }
 
 Request::Request(Options const &options):
-	options(options), completed(false), closed(false) {
+	options(options), initialized(false), completed(false), closed(true) {
 	this->id = ++Request::count;
 }
 
@@ -36,8 +36,13 @@ std::ostream &Request::log(void) const {
 }
 
 bool Request::initialize(void) {
-	if (this->server.connect(options.ip, options.port))
+	this->initialized = true;
+	if (!this->server.connect(options.ip, options.port)) {
+		this->closed = true;
+		return (false);
+	} else
 		this->log() << "Connected to " << options.ip << ":" << options.port << std::endl;
+	this->closed = false;
 	return (options.noOutput || (!options.noOutput && this->output.create()));
 }
 
@@ -52,6 +57,8 @@ void Request::showRecap(void) {
 }
 
 void Request::displayResult(void) const {
+	if (!this->initialized)
+		return ;
 	if (stats.totalSend > 0 || stats.totalRecv > 0) {
 		this->log() << KCYN "Received" KNRM ": " KMAG << stats.totalRecv << " bytes" KNRM " in "
 				KBLU << ((stats.lastRecv - stats.recvStart) / 1000.) << "s" KNRM " | "
@@ -95,8 +102,8 @@ void Request::displayResult(void) const {
 				std::cout << std::endl;
 			this->log() << KYEL "### END OF RESPONSE" KNRM << std::endl;
 		}
-	} else
-		this->log() << KYEL "Nothing sent nor received" KNRM << std::endl;
+	} /* else
+		this->log() << KYEL "Nothing sent nor received" KNRM << std::endl; */
 }
 
 bool Request::isCompleted(void) const {
@@ -117,7 +124,7 @@ void Request::receive(SelectSet const &set) {
 	static int lastRecv = 0;
 	if (set.ready(FD_READ, server.fd)) {
 		if ((lastRecv = ::recv(server.fd, Request::buffer, options.getSize(Options::P_RECV_SIZE), 0)) < 0) {
-			std::cerr << "kuraianto: error while receiving from server\n";
+			this->log() << "kuraianto: error while receiving from server\n";
 			this->closed = true;
 			return ;
 		}

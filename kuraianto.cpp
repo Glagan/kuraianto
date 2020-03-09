@@ -6,7 +6,7 @@
 /*   By: ncolomer <ncolomer@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2020/03/05 12:58:54 by ncolomer          #+#    #+#             */
-/*   Updated: 2020/03/08 22:44:35 by ncolomer         ###   ########.fr       */
+/*   Updated: 2020/03/09 19:49:05 by ncolomer         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -73,10 +73,8 @@ int main(int argc, char const **argv) {
 
 	// Initialize connections
 	for (auto &request : requests) {
-		if (!request->initialize()) {
-			g_running = false;
+		if (!request->initialize())
 			break ;
-		}
 	}
 
 	// main

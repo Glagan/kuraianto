@@ -42,6 +42,7 @@ If the ``Transfer-Encoding`` header is set to ``chunked`` **kuraianto** will sen
 
 ## TODO
 
-* Fix displayed durations
+* Avoid displaying message if the previous one was really close
+* Display the number of failed requests
 * ``-a``
 	* Read and send all files given as the value (e.g: a folder ``examples`` or list of files ``examples/1.req,examples/2.req``)

@@ -6,7 +6,7 @@
 /*   By: ncolomer <ncolomer@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2020/03/08 14:55:29 by ncolomer          #+#    #+#             */
-/*   Updated: 2020/03/08 22:22:58 by ncolomer         ###   ########.fr       */
+/*   Updated: 2020/03/09 19:42:31 by ncolomer         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -30,6 +30,7 @@ protected:
 	Stats stats;
 	unsigned long lastRecap;
 	int id;
+	bool initialized;
 	bool completed;
 	bool closed;
 
