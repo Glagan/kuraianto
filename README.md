@@ -4,8 +4,7 @@
 
 Compile with ``make``
 
-> **kuraianto** is reading from stdin by default.
-> e.g: ``cat examples/GET_simple.req | ./kuraianto 8000``
+> **kuraianto** is reading from stdin by default. ``cat examples/GET_simple.req | ./kuraianto 8000``
 
 ```
 usage: [ip:]port [options]
@@ -44,6 +43,5 @@ If the ``Transfer-Encoding`` header is set to ``chunked`` **kuraianto** will sen
 ## TODO
 
 * Fix displayed durations
-* Fix last line jump after response
 * ``-a``
 	* Read and send all files given as the value (e.g: a folder ``examples`` or list of files ``examples/1.req,examples/2.req``)

@@ -6,7 +6,7 @@
 /*   By: ncolomer <ncolomer@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2020/03/08 14:55:30 by ncolomer          #+#    #+#             */
-/*   Updated: 2020/03/08 22:41:11 by ncolomer         ###   ########.fr       */
+/*   Updated: 2020/03/09 14:20:17 by ncolomer         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -71,6 +71,8 @@ void Request::displayResult(void) const {
 			this->log() << KYEL "### RESPONSE" KNRM << std::endl;
 			this->log();
 			while ((lastRead = read(output.fd, buffer, 4095)) > 0) {
+				nlPos = 0;
+				offset = 0;
 				buffer[lastRead] = 0;
 				while ((pos = (char*)memchr(buffer + offset, '\n', lastRead - offset))) {
 					nlPos = (pos - buffer);
@@ -82,13 +84,15 @@ void Request::displayResult(void) const {
 				}
 				if (offset > 0 && offset < lastRead) {
 					std::cout << std::string(buffer + offset, lastRead - offset);
+					if (lastRead < 4095)
+						std::cout << std::endl;
 				} else if (!pos && !offset)
 					std::cout << std::string(buffer, lastRead);
 				if (lastRead < 4095 && nlPos > offset)
 					std::cout << std::endl;
-				nlPos = 0;
-				offset = 0;
 			}
+			if (nlPos >= offset)
+				std::cout << std::endl;
 			this->log() << KYEL "### END OF RESPONSE" KNRM << std::endl;
 		}
 	} else
@@ -248,7 +252,8 @@ bool GeneratedRequest::generate(void) {
 	// Generate (not) chunked body
 	} else if (this->state == State::BODY) {
 		int generated = (this->remainingBody > 4096) ? 4096 : this->remainingBody;
-		this->buffer.append(generated, (char)('c'));
+		int randChar = ((rand() % (250 - 32 + 1)) + 32);
+		this->buffer.append(generated, (char) randChar);
 		this->remainingBody -= generated;
 		if (this->remainingBody == 0)
 			this->state = State::DONE;
@@ -260,8 +265,9 @@ bool GeneratedRequest::generate(void) {
 		} else {
 			int chunkSize = options.getSize(Options::P_CHUNK_SIZE);
 			int generated = (chunkSize > this->remainingBody) ? this->remainingBody : chunkSize;
+			int randChar = ((rand() % (250 - 32 + 1)) + 32);
 			this->buffer.append(int2hex(generated) + "\r\n");
-			this->buffer.append(generated, (char)('c'));
+			this->buffer.append(generated, (char) randChar);
 			this->buffer.append("\r\n");
 			this->remainingBody -= generated;
 		}
