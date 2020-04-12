@@ -14,8 +14,6 @@
 
 int Output::idx = 0;
 
-#include <iostream>
-
 unsigned long getCurrentTime(void) {
     struct timespec spec;
 	unsigned long ms;

@@ -12,6 +12,7 @@
 
 #pragma once
 
+# include <string.h>
 # include "Utility.hpp"
 
 typedef struct s_request_definition {
@@ -40,6 +41,7 @@ public:
 		P_NO_OUTPUT
 	};
 private:
+	static bool match(char const *str, char const *against);
 	int rangeRand(Range const &range) const;
 
 	bool setIp(char const *value);
@@ -61,7 +63,7 @@ public:
 
 	Options();
 	virtual ~Options();
-	bool initalize(size_t argc, char const **argv);
+	bool initalize(std::vector<std::string> &files, size_t argc, char const **argv);
 
 	int getSize(Key range) const;
 };

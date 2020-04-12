@@ -12,6 +12,7 @@
 
 #pragma once
 
+# include <signal.h>
 # include "Utility.hpp"
 # include "Options.hpp"
 # include "Request.hpp"

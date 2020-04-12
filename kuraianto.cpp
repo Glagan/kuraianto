@@ -15,7 +15,7 @@
 int g_running = 1;
 
 void showUsage(void) {
-	std::cout << "usage: [ip:]port [options]\n\
+	std::cout << "usage: [options] [ip:]port [...files]\n\
 		\r\rOptions:\n\
 		\r\trange: value | min-max | -max\n\
 		\r\trequests: [Type,uri,[Header-Name: value,]*bodySize;[repeat;]]+\n\
@@ -55,7 +55,8 @@ int main(int argc, char const **argv) {
 
 	// Options
 	Options options;
-	if (!options.initalize(argc, argv)) {
+	std::vector<std::string> files;
+	if (!options.initalize(files, argc, argv)) {
 		std::cerr << "kuraianto: invalid option\n";
 		showUsage();
 		return (1);
@@ -63,63 +64,81 @@ int main(int argc, char const **argv) {
 	Request::createBuffer(options.biggestBufferSize);
 	srand(time(0));
 
-	// Add stdin Request or Generated Requests
 	std::vector<Request*> requests;
-	if (!options.requests.size())
+	// Add file requests
+	for (auto const &requestFile : files) {
+		int fd = open(requestFile.c_str(), O_RDONLY);
+		if (fd < 0) {
+			std::cout << KRED "Could not open file `" << requestFile << "`" KNRM << std::endl;
+		} else {
+			requests.push_back(new FileRequest(options, fd));
+		}
+	}
+	// Add stdin Request or Generated Requests
+	if (options.requests.size() == 0 && requests.size() == 0)
 		requests.push_back(new FileRequest(options, STDIN_FILENO));
-	else for (auto const &requestDefinition : options.requests)
-			for (int i = 0; i < requestDefinition->repeat; ++i)
-				requests.push_back(new GeneratedRequest(options, *requestDefinition));
+	for (auto const &requestDefinition : options.requests)
+		for (int i = 0; i < requestDefinition->repeat; ++i)
+			requests.push_back(new GeneratedRequest(options, *requestDefinition));
 
 	// Initialize connections
-	for (auto &request : requests) {
-		if (!request->initialize())
-			break ;
-	}
+	size_t initalizedRequests = 0;
+	for (auto &request : requests)
+		if (request->initialize())
+			++initalizedRequests;
 
-	// main
-	signal(SIGINT, &stop);
-	SelectSet set;
-	struct timeval timeout;
-	int activity;
-	int tic = 1;
-	while (g_running) {
-		timeout.tv_sec = 1;
-		timeout.tv_usec = 0;
+	// Avoid doing anything if there is no requests
+	if (initalizedRequests > 0) {
+		std::cout << "Sending " << requests.size()
+				<< " request" << (requests.size() > 1 ? "s" : "")
+				<< " to " << options.ip << ':' << options.port << std::endl;
 
-		// Add each requests to select
-		set.zero();
-		for (auto const &request : requests)
-			if (!request->isClosed())
-				request->addToSet(set);
+		// main
+		signal(SIGINT, &stop);
+		SelectSet set;
+		struct timeval timeout;
+		int activity;
+		int tic = 1;
+		while (g_running) {
+			timeout.tv_sec = 1;
+			timeout.tv_usec = 0;
 
-		// Search ready fds
-		activity = select(set.max + 1, &set.readfds, &set.writefds, NULL, &timeout);
-		if (activity < 0 && errno != EINTR) {
-			perror("kuraianto: select");
-			break ;
-		} else if (activity < 1) {
-			std::cout << ((tic++ % 2 == 0) ? "tac" : "tic") << std::endl;
-			if (tic > options.timeout) {
-				std::cout << "Connection expired after " << options.timeout << " seconds, that's too bad (or is it ?)" << std::endl;
+			// Add each requests to select
+			set.zero();
+			for (auto const &request : requests)
+				if (!request->isClosed())
+					request->addToSet(set);
+
+			// Search ready fds
+			activity = select(set.max + 1, &set.readfds, &set.writefds, NULL, &timeout);
+			if (activity < 0 && errno != EINTR) {
+				perror("kuraianto: select");
 				break ;
+			} else if (activity < 1) {
+				std::cout << ((tic++ % 2 == 0) ? "tac" : "tic") << std::endl;
+				if (tic > options.timeout) {
+					std::cout << "Connection expired after " << options.timeout << " seconds, that's too bad (or is it ?)" << std::endl;
+					break ;
+				}
+				continue ;
 			}
-			continue ;
-		}
 
-		// Send and receive each requests
-		for (auto &request : requests) {
-			if (!request->isClosed()) {
-				request->receive(set);
-				if (!request->isCompleted())
-					request->send(set);
-				request->showRecap();
+			// Send and receive each requests
+			for (auto &request : requests) {
+				if (!request->isClosed()) {
+					request->receive(set);
+					if (!request->isCompleted())
+						request->send(set);
+					request->showRecap();
+				}
 			}
-		}
 
-		// Sleep if needed
-		if (options.interval.min > 0)
-			usleep(options.getSize(Options::P_INTERVAL) * 1000);
+			// Sleep if needed
+			if (options.interval.min > 0)
+				usleep(options.getSize(Options::P_INTERVAL) * 1000);
+		}
+	} else {
+		std::cout << KYEL << "No valid Requests -- nothing sent !" KNRM << std::endl;
 	}
 
 	// done -- display output and clear everything

@@ -12,6 +12,7 @@
 
 #pragma once
 
+# include <algorithm>
 # include <iostream>
 # include <iomanip>
 # include "terminal.h"

@@ -129,21 +129,30 @@ bool Options::setRequests(char const *value) {
 	return (true);
 }
 
-bool Options::initalize(size_t argc, char const **argv) {
+bool Options::match(char const *str, char const *against) {
+	return (strcmp(str, against) == 0);
+}
+
+bool Options::initalize(std::vector<std::string> &files, size_t argc, char const **argv) {
 	try {
-		if (!this->setIp(argv[1]))
-			return (false);
 		Key state = P_NONE;
-		for (size_t i = 2; state >= 0 && i < argc; ++i) {
+		size_t i = 1;
+		for ( ; i < argc; ++i) {
 			if (!state) {
-				state = (strcmp(argv[i], "-r") == 0) ? P_RECV_SIZE :
-						(strcmp(argv[i], "-s") == 0) ? P_SEND_SIZE :
-						(strcmp(argv[i], "-t") == 0) ? P_TIMEOUT   :
-						(strcmp(argv[i], "-i") == 0) ? P_INTERVAL  :
-						(strcmp(argv[i], "-g") == 0) ? P_GENERATE  :
-						(strcmp(argv[i], "-h") == 0) ? P_HEADERS   :
-						(strcmp(argv[i], "-c") == 0) ? P_CHUNK_SIZE :
-						(strcmp(argv[i], "--no-output") == 0) ? P_NO_OUTPUT : P_INVALID;
+				state = Options::match(argv[i], "-r")	? P_RECV_SIZE :
+						Options::match(argv[i], "-s")	? P_SEND_SIZE :
+						Options::match(argv[i], "-t")	? P_TIMEOUT   :
+						Options::match(argv[i], "-i")	? P_INTERVAL  :
+						Options::match(argv[i], "-g")	? P_GENERATE  :
+						Options::match(argv[i], "-h")	? P_HEADERS   :
+						Options::match(argv[i], "-c")	? P_CHUNK_SIZE :
+						Options::match(argv[i], "--no-output") ? P_NO_OUTPUT : P_NONE;
+				if (state == P_NONE) {
+					break ;
+				} else if (state == P_NO_OUTPUT) {
+					this->noOutput = true;
+					state = P_NONE;
+				}
 			} else if (state == P_TIMEOUT) {
 				this->timeout = std::stoi(argv[i]);
 				if (this->timeout < 1)
@@ -159,7 +168,7 @@ bool Options::initalize(size_t argc, char const **argv) {
 			} else if (state == P_HEADERS) {
 				this->headers = split(argv[i], "#");
 				state = P_NONE;
-			} else {
+			} else if (state != P_NONE) {
 				Range &which =  (state == P_RECV_SIZE) ? this->recvSize :
 								(state == P_SEND_SIZE) ? this->sendSize :
 								(state == P_INTERVAL)  ? this->interval : this->chunkSize;
@@ -169,13 +178,12 @@ bool Options::initalize(size_t argc, char const **argv) {
 					this->biggestBufferSize = which.max;
 				state = P_NONE;
 			}
-			if (state == P_NO_OUTPUT) {
-				this->noOutput = true;
-				state = P_NONE;
-			}
 		}
-		if (state == P_INVALID)
+		if (!this->setIp(argv[i++]))
 			return (false);
+		for ( ; i < argc; ++i) {
+			files.push_back(argv[i]);
+		}
 		return (true);
 	} catch(const std::exception& e) {
 		return (false);

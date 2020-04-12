@@ -7,7 +7,7 @@ Compile with ``make``
 > **kuraianto** is reading from stdin by default. ``cat examples/GET_simple.req | ./kuraianto 8000``
 
 ```
-usage: [ip:]port [options]
+usage: [options] [ip:]port [...files]
 Options:
 	range: value | min-max | -max
 	request: [Type,uri,[Header-Name: value,]*bodySize;[repeat;]]+
@@ -34,15 +34,11 @@ Type,uri,[Header-Name: value,]*bodySize[;repeat]
 # e.g POST,/upload,Transfer-Encoding: chunked,X-Token: token,4242;3
 ```
 
-The ``repeat`` parameter duplicate the previous request *x* amount of times.
-
-Headers added with ``-h`` are added to all generated requests.
-
+The ``repeat`` parameter duplicate the previous request *x* amount of times.  
+Headers added with ``-h`` are added to all generated requests.  
 If the ``Transfer-Encoding`` header is set to ``chunked`` **kuraianto** will send chunks of the size of your ``-c`` option.
 
 ## TODO
 
 * Avoid displaying message if the previous one was really close
 * Display the number of failed requests
-* ``-a``
-	* Read and send all files given as the value (e.g: a folder ``examples`` or list of files ``examples/1.req,examples/2.req``)
