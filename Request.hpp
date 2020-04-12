@@ -33,6 +33,7 @@ protected:
 	int id;
 	bool initialized;
 	bool completed;
+	bool failed;
 	bool closed;
 
 	std::ostream &log(void) const;
@@ -48,8 +49,11 @@ public:
 	void showRecap(void);
 	void displayResult(void) const;
 	bool isCompleted(void) const;
+	bool isSuccessful(void) const;
+	bool hasFailed(void) const;
 	bool isClosed(void) const;
 	virtual void addToSet(SelectSet &set) const;
+	void addToSummary(Summary &summary) const;
 
 	void receive(SelectSet const &set);
 	void send(SelectSet const &set);

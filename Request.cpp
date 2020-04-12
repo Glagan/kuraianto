@@ -106,8 +106,18 @@ void Request::displayResult(void) const {
 		this->log() << KYEL "Nothing sent nor received" KNRM << std::endl; */
 }
 
+void Request::addToSummary(Summary &summary) const {
+	summary.stats.totalRead += this->stats.totalRead;
+	summary.stats.totalRecv += this->stats.totalRecv;
+	summary.stats.totalSend += this->stats.totalSend;
+}
+
 bool Request::isCompleted(void) const {
 	return (this->completed);
+}
+
+bool Request::hasFailed(void) const {
+	return (this->failed);
 }
 
 bool Request::isClosed(void) const {
@@ -137,6 +147,8 @@ void Request::receive(SelectSet const &set) {
 		stats.lastRecv = getCurrentTime();
 		if (lastRecv == 0) {
 			this->log() << "Server closed the connection, that's fucked up...\n";
+			if (!this->completed)
+				this->failed = true;
 			this->closed = true;
 			return ;
 		}
@@ -171,6 +183,7 @@ void Request::send(SelectSet const &set) {
 		if ((lastSend = ::send(server.fd, Request::buffer, size, 0)) < 0) {
 			std::cerr << "kuraianto: error while sending request\n";
 			this->closed = true;
+			this->failed = true;
 			this->completed = true;
 			return ;
 		}

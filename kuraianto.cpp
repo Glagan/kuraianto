@@ -55,6 +55,7 @@ int main(int argc, char const **argv) {
 
 	// Options
 	Options options;
+	Summary summary;
 	std::vector<std::string> files;
 	if (!options.initalize(files, argc, argv)) {
 		std::cerr << "kuraianto: invalid option\n";
@@ -82,15 +83,14 @@ int main(int argc, char const **argv) {
 			requests.push_back(new GeneratedRequest(options, *requestDefinition));
 
 	// Initialize connections
-	size_t initalizedRequests = 0;
 	for (auto &request : requests)
 		if (request->initialize())
-			++initalizedRequests;
+			++summary.initialized;
 
 	// Avoid doing anything if there is no requests
-	if (initalizedRequests > 0) {
-		std::cout << "Sending " << requests.size()
-				<< " request" << (requests.size() > 1 ? "s" : "")
+	if (summary.initialized > 0) {
+		std::cout << "Sending " << summary.initialized
+				<< " request" << (summary.initialized > 1 ? "s" : "")
 				<< " to " << options.ip << ':' << options.port << std::endl;
 
 		// main
@@ -137,17 +137,42 @@ int main(int argc, char const **argv) {
 			if (options.interval.min > 0)
 				usleep(options.getSize(Options::P_INTERVAL) * 1000);
 		}
+
+		// done -- display output and clear everything
+		for (auto &request : requests) {
+			request->displayResult();
+			if (request->hasFailed())
+				++summary.failed;
+			else if (request->isCompleted())
+				++summary.completed;
+			request->addToSummary(summary);
+			delete request;
+		}
 	} else {
 		std::cout << KYEL << "No valid Requests -- nothing sent !" KNRM << std::endl;
 	}
 
-	// done -- display output and clear everything
-	for (auto &request : requests) {
-		request->displayResult();
-		delete request;
+	// Summary
+	if (summary.initialized != requests.size()) {
+		size_t diff = requests.size() - summary.initialized;
+		std::cout << KYEL "Failed to initialize " << diff << " request"
+				<< (diff > 0 ? "s" : "") << "\n" KNRM;
 	}
-	Request::deleteBuffer();
+	if (summary.failed > 0) {
+		std::cout << KYEL "Failed to send " << summary.failed << " request"
+				<< (summary.failed > 0 ? "s" : "") << "\n" KNRM;
+	}
+	if (summary.completed > 0) {
+		std::cout << KGRN "Successfuly sent " << summary.completed << " request"
+				<< (summary.completed > 0 ? "s" : "") << "\n" KNRM;
+	}
+	if (summary.stats.totalSend > 0 || summary.stats.totalRecv > 0) {
+		std::cout << KBLU "Read " KMAG << summary.stats.totalRead << " bytes" KNRM
+				", " KCYN "Received " KMAG << summary.stats.totalRecv << " bytes" KNRM
+				" and " KBLU "Sent " KMAG << summary.stats.totalSend << " bytes\n" KNRM;
+	}
 
+	Request::deleteBuffer();
 	std::cout << "Thank you for your service\n";
     return (0);
 }

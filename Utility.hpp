@@ -44,7 +44,7 @@ typedef struct s_stats {
 	int totalSend;
 	int totalRecv;
 
-	s_stats(void): totalRead(0), totalRecv(0), totalSend(0) {}
+	s_stats(void): totalRead(0),  totalSend(0), totalRecv(0) {}
 } Stats;
 
 typedef struct s_output {
@@ -121,5 +121,14 @@ typedef struct s_set {
 		return (FD_ISSET(fd, (type == FD_READ) ? &this->readfds : &this->writefds));
 	}
 } SelectSet;
+
+typedef struct s_summary {
+	size_t initialized;
+	size_t failed;
+	size_t completed;
+	Stats stats;
+
+	s_summary(void): initialized(0), failed(0), completed(0) {}
+} Summary;
 
 unsigned long getCurrentTime(void);
